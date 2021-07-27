@@ -6,11 +6,13 @@ Whereas the contained physical methods are well-studied and known since decades,
 The publication [Parameterized Reinforcement learning for Optical System Optimization](https://iopscience.iop.org/article/10.1088/1361-6463/abfddb) used this environment.
 
 ## Installation
-1.
-conda install git pip
-pip install git+git://github.com/scrappy/scrappy@master
-2.
+1.<br/>
+conda install git pip<br/>
+pip install git+https://github.com/MLResearchAtOSRAM/gym-multilayerthinfilm.git<br/><br/>
+2.<br/>
 Clone the repository and executing setup.py
+
+In case any dependency is not fullfilled, you can create an environment using gym_multilayerthinfilm.yml which is located in the package folder. 
 
 ## Multi-layer thin films meet parameterized reinforcement learning
 Reinforcement learning is an area of machine learning concerned with how intelligent agents ought to take actions in an environment in order to maximize the notion of reward. The code to be published implements such an environment for the optimization of multi-layer thin films.
