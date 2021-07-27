@@ -5,6 +5,13 @@ The proposed OpenAI gym environment utilizes a parallelized transfer-matrix meth
 Whereas the contained physical methods are well-studied and known since decades, the contribution of this code lies the transfer to an OpenAI gym environment. The intention is to enable AI researchers without optical expertise to solve the corresponding parameterized Markov decision processes. Due to their structure, the solution of such problems is still an active field of research in the AI community.<br/>
 The publication [Parameterized Reinforcement learning for Optical System Optimization](https://iopscience.iop.org/article/10.1088/1361-6463/abfddb) used this environment.
 
+## Installation
+1.
+conda install git pip
+pip install git+git://github.com/scrappy/scrappy@master
+2.
+Clone the repository and executing setup.py
+
 ## Multi-layer thin films meet parameterized reinforcement learning
 Reinforcement learning is an area of machine learning concerned with how intelligent agents ought to take actions in an environment in order to maximize the notion of reward. The code to be published implements such an environment for the optimization of multi-layer thin films.
 In principle, the proposed code allows to execute actions taken by an agent. These actions determine which material of which thickness to stack next, thereby consecutively forming a multi-layer thin film as illustrated in figure 1. Such a multi-layer thin film exhibits optical characteristics. By comparison between the actual and user-defined desired characteristics, a notion of numeric reward is computed based on which the agent learns to distinguish between good and bad design choices. Due to its physical and mathematical structure, the optimization of multi-layer thin film remains a challenging and thus still active field of research in the scientific community. As such it gained recent attention in many publications. Therefore, naturally the need for a standardised environment arises to make the corresponding research more trustful, comparable and consistent.
