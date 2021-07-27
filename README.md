@@ -12,7 +12,12 @@ pip install git+https://github.com/MLResearchAtOSRAM/gym-multilayerthinfilm.git<
 2.<br/>
 Clone the repository and executing setup.py
 
-In case any dependency is not fullfilled, you can create an environment using gym_multilayerthinfilm.yml which is located in the package folder. 
+In case any dependency is not fullfilled, you can create an environment using gym_multilayerthinfilm.yml which is located in the package folder; dont forget to specify your pyhton environment folder/path there (prefix).<br/>
+In general, there are no weird dependencies aside from numpy, matplotlib, seaborn, dask and gym. The tmm package can be downloaded/installed from here if necessary:<br/>
+pip install git+https://github.com/sbyrnes321/tmm.git
+
+## Getting started
+To get started you can do the tutorial notebook example.ipynb or just check out the quickstarter.py!
 
 ## Multi-layer thin films meet parameterized reinforcement learning
 Reinforcement learning is an area of machine learning concerned with how intelligent agents ought to take actions in an environment in order to maximize the notion of reward. The code to be published implements such an environment for the optimization of multi-layer thin films.
@@ -40,12 +45,3 @@ In general, the comprehensive optimization of multi-layer thin films in regards 
 
 ![image](https://user-images.githubusercontent.com/83709614/127179200-16aaf611-ad17-4082-a47f-d933ba7cbc83.png)<br/> 
 Figure 2: Rendered output of the environment. Reflectivity (left) over angle of incidence and spectrum of a multi-layer thin film (right). Here, the stack features four layers and each layer’s material was chosen from a set of eight alternatives. The reward is computed based on a desired reflectivity, which is one for each angle and wavelength, but not displayed in this figure.
-
-
-## Getting started
-Required packages:<br/>
-numpy, matplotlib, seaborn, dask, tmm as specified in env_mltf.yml
-based on which you can create an approbiate environment via line command<br/>
-conda env create -f env_mltf.yml<br/>
-Don't  forget to specify your common python environment path (prefix, last line in env_mltf.yml)!
-
