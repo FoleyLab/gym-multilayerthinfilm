@@ -7,7 +7,6 @@ The publication [Parameterized Reinforcement learning for Optical System Optimiz
 
 ## Installation
 1.<br/>
-conda install git pip<br/>
 pip install git+https://github.com/MLResearchAtOSRAM/gym-multilayerthinfilm.git<br/><br/>
 2.<br/>
 Clone the repository and executing setup.py
