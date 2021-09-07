@@ -2,8 +2,10 @@ import numpy as np
 
 def get_n_from_txt(filepath, points=None, lambda_min=400, lambda_max=700, complex_n=True):
     ntxt = np.loadtxt(filepath)
+    if np.min(np.abs(ntxt[:, 0] - lambda_min)) > 25 or np.min(np.abs(ntxt[:, 0] - lambda_max)) > 25:
+        print('No measurement data for refractive indicies are available within 25 nm in \n' + filepath)
     if points is None:
-        points = lambda_max - lambda_min
+        points = lambda_max - lambda_min + 1
     idxmin = np.argmin(np.abs(ntxt[:, 0] - lambda_min))
     idxmax = np.argmin(np.abs(ntxt[:, 0] - lambda_max))
     if idxmax == idxmin:

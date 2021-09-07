@@ -16,6 +16,8 @@ class MultiLayerThinFilm(gym.Env):
         must also assign a thickness to this layer. This formulation allows to interpret the subsequent stacking of
         layers as a parameterized Markov decision process. (See publication for details)
 
+        Contributors: Heribert Wankerl, Alexander Luce, Maike Stern
+        (Feel free to add your name to the list in case you made major contributions or changes)
                 Args:
 
                   N:                  np.array of shape [M x S]
@@ -57,11 +59,17 @@ class MultiLayerThinFilm(gym.Env):
         # target-related:
         # wavelength range
         self.wl = target['spectrum']
+        # mode: 'reflectivity' or 'transmittivity'
+        if target['mode'] == 'transmittivity' or target['mode'] == 'reflectivity':
+            self.mode = target['mode']
+        else:
+            self.mode = 'reflectivity'
+            print('Invalid mode -> set to reflectivity!')
         # angel range
         self.angle = target['direction']
         # desired value for reflectivity (pixelwise)
         self.target = target['target']
-        if not weights:
+        if weights is None:
             self.weights = np.ones_like(self.target)
         # reward computation:
         self.normalization = normalization
@@ -81,8 +89,16 @@ class MultiLayerThinFilm(gym.Env):
             self.n_ambient = np.ones((1, self.wl.shape[0]))
             self.d_ambient = np.array([np.inf])
             print('--- ambient is set to vacuum of infinite thickness ---')
+        if np.iscomplex(self.n_substrate[0, :]).any():
+            self.n_substrate[0, :] = np.real(self.n_substrate[0, :])
+            print('n_substrate must feature real-valued refractive indicies in first layer for computational/physical reasons (TMM); adopted via np.real()')
+        if np.iscomplex(self.n_ambient[-1, :]).any():
+            self.n_ambient[-1, :] = np.real(self.n_ambient[-1, :])
+            print('n_ambient must feature real-valued refractive indicies in last layer for computational/physical reasons (TMM); adopted via np.real()')
         assert not np.iscomplex(self.n_substrate[0, :]).any(), 'n_substrate must feature real-valued refractive indicies in first layer for computational/physical reasons (TMM)..'
         assert not np.iscomplex(self.n_ambient[-1, :]).any(), 'n_ambient must feature real-valued refractive indicies in last layer for computational/physical reasons (TMM)..'
+        self.d_substrate = self.d_substrate.reshape(-1, 1)
+        self.d_ambient = self.d_ambient.reshape(-1, 1)
 
         self.work_path = work_path
         # borders for thicknesses:
@@ -107,8 +123,46 @@ class MultiLayerThinFilm(gym.Env):
                                           spaces.Box(low=0, high=1, shape=(1,))))
         # simulation state space:
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.target.shape[0],), dtype=np.int)
-        self.weights = weights
+        if weights is None:
+            self.weights = np.ones_like(self.target)
+        else:
+            self.weights = weights
+            assert weights.shape[0] == self.target.shape[0] and weights.shape[1] == self.target.shape[1], 'Shape of weights and target must coincide!'
+            assert np.all(weights >= 0), 'weights are supposed to be non-negative!'
+            if np.all(weights == 0):
+                self.weights = np.ones_like(self.target)
+                print('All weights were zero -> if nothing is important quit optimization; we set each weight to one for you ;)...')
+        self.weights = self.weights / np.max(self.weights)
         assert self.N.shape == tuple([self.number_of_materials, self.wl.shape[0]]), 'N does not match with target!'
+
+    def set_cladding(self, substrate=None, ambient=None):
+        if substrate is not None:
+            self.n_substrate = substrate['n']
+            self.d_substrate = substrate['d']
+        else:
+            self.n_substrate = np.ones((1, self.wl.shape[0]))
+            self.d_substrate = np.array([np.inf]).squeeze()
+            print('--- substrate is set to vacuum of infinite thickness ---')
+        if ambient is not None:
+            self.n_ambient = ambient['n']
+            self.d_ambient = ambient['d']
+        else:
+            self.n_ambient = np.ones((1, self.wl.shape[0]))
+            self.d_ambient = np.array([np.inf]).squeeze()
+            print('--- ambient is set to vacuum of infinite thickness ---')
+        if np.iscomplex(self.n_substrate[0, :]).any():
+            self.n_substrate[0, :] = np.real(self.n_substrate[0, :])
+            print(
+                'n_substrate must feature real-valued refractive indicies in first layer for computational/physical reasons (TMM); adopted via np.real()')
+        if np.iscomplex(self.n_ambient[-1, :]).any():
+            self.n_ambient[-1, :] = np.real(self.n_ambient[-1, :])
+            print(
+                'n_ambient must feature real-valued refractive indicies in last layer for computational/physical reasons (TMM); adopted via np.real()')
+        assert not np.iscomplex(self.n_substrate[0, :]).any(), 'n_substrate must feature real-valued refractive indicies in first layer for computational/physical reasons (TMM)..'
+        assert not np.iscomplex(self.n_ambient[-1, :]).any(), 'n_ambient must feature real-valued refractive indicies in last layer for computational/physical reasons (TMM)..'
+        self.d_substrate = self.d_substrate.reshape(-1, 1)
+        self.d_ambient = self.d_ambient.reshape(-1, 1)
+        print('cladding set....')
 
     def step(self, action):
         """
@@ -179,7 +233,7 @@ class MultiLayerThinFilm(gym.Env):
         self.d = []
         if self._initial_nmb_layers > 0:
             num_layers = random.randint(1, self._initial_nmb_layers - 1)
-            for count in range(num_layers):
+            for _ in range(num_layers):
                 rnd_material_idx = random.randint(0, self.number_of_materials)
                 rnd_material_d = random.uniform(0, 1)
                 self.layers.append(rnd_material_idx)
@@ -237,7 +291,7 @@ class MultiLayerThinFilm(gym.Env):
             plt.xticks(xaxis, xtickslabels)
             plt.xlabel('Wavelength [nm]')
             plt.ylabel('Reflectivity [1]')
-            plt.ylim([0, 1])
+            plt.ylim([0, 1.05])
             plt.title('Reflectivity at incidence angle of ' + str(self.angle[0]) + '°\nReward = ' + str(np.round(self.reward, 4)))
         elif self.wl.shape[0] == 1:
             xaxis = np.linspace(0, self.angle.shape[0], 10, dtype=int)
@@ -247,7 +301,7 @@ class MultiLayerThinFilm(gym.Env):
             plt.xticks(xaxis, xtickslabels)
             plt.xlabel('Angle [deg, °]')
             plt.ylabel('Reflectivity [1]')
-            plt.ylim([0, 1])
+            plt.ylim([0, 1.05])
             plt.title('Reflectivity at wavelength ' + str(np.round(self.wl[0] * 10 ** 9, 3)) + ' nm\nReward = ' + str(np.round(self.reward, 4)))
         else:
             yticks = np.linspace(0, self.target.shape[0], 10, dtype=int)
@@ -255,14 +309,15 @@ class MultiLayerThinFilm(gym.Env):
             xticks = np.linspace(0, self.target.shape[1], 10, dtype=int)
             xtickslabels = np.linspace(np.min(self.wl*10**9), np.max(self.wl*10**9), 10, dtype=int)
             colormap = None  # 'twilight'
-            g = sns.heatmap(self.simulation, vmin=0, vmax=1, ax=self.axs[0], xticklabels=xtickslabels, yticklabels=ytickslabels,
+            g = sns.heatmap(self.simulation, vmin=np.min(self.simulation), vmax=np.max(self.simulation), ax=self.axs[0], xticklabels=xtickslabels, yticklabels=ytickslabels,
                             cmap=colormap, cbar=cbar)
             g.set_xticks(xticks)
             g.set_yticks(yticks)
             g.set_ylabel('Angle [deg, °]')
             g.set_xlabel('Wavelength [nm]')
             g.set_xticklabels(g.get_xticklabels(), rotation=45)
-            g.set_title('Reflectivity\nReward = ' + str(np.round(self.reward, 4)))
+            g.set_yticklabels(g.get_yticklabels(), rotation=0)
+            g.set_title(self.mode + '\nReward = ' + str(np.round(self.reward, 4)))
 
         # plot stack:
         plt.sca(self.axs[1])
@@ -289,8 +344,81 @@ class MultiLayerThinFilm(gym.Env):
         from matplotlib.lines import Line2D
         legend_elements = [Line2D([0], [0], color=colors[idx], lw=10, label='Material ' + str(idx+1)) for idx in range(self.N.shape[0])]
         plt.legend(handles=legend_elements, loc='center right')
+        plt.tight_layout()
         plt.show(block=False)
+        plt.pause(0.1)
         return [self.f, self.axs]
+
+    def render_target(self):
+        assert self.wl.shape[0] > 1 or self.angle.shape[0] > 1, 'No rendering for single wavelenght and single direction!'
+        f_target, axs_target = plt.subplots(nrows=1, ncols=2, )
+        # plot target:
+        if self.angle.shape[0] == 1:
+            xaxis = np.linspace(0, self.wl.shape[0], 10, dtype=int)
+            xtickslabels = np.linspace(np.min(self.wl * 10 ** 9), np.max(self.wl * 10 ** 9), 10, dtype=int)
+            #target:
+            plt.sca(axs_target[0])
+            plt.plot(self.target.squeeze())
+            plt.xticks(xaxis, xtickslabels)
+            plt.xlabel('Wavelength [nm]')
+            plt.ylabel(self.mode + ' [1]')
+            plt.ylim([0, 1.05])
+            plt.title('Target at incidence angle of ' + str(self.angle[0]) + ' °')
+            #weights
+            plt.sca(axs_target[1])
+            plt.plot(self.weights.squeeze())
+            plt.xticks(xaxis, xtickslabels)
+            plt.xlabel('Wavelength [nm]')
+            plt.ylabel('Weight [1]')
+            plt.ylim([0, 1.05 * np.max(self.weights)])
+            plt.title('Weights at incidence angle of ' + str(self.angle[0]) + ' °')
+        elif self.wl.shape[0] == 1:
+            xaxis = np.linspace(0, self.angle.shape[0], 10, dtype=int)
+            xtickslabels = np.linspace(np.min(self.angle), np.max(self.angle), 10, dtype=int)
+            #target
+            plt.sca(axs_target[0])
+            plt.plot(self.target.squeeze())
+            plt.xticks(xaxis, xtickslabels)
+            plt.xlabel('Angle [deg, °]')
+            plt.ylabel(self.mode + ' [1]')
+            plt.ylim([0, 1.05])
+            plt.title('Target at wavelength ' + str(np.round(self.wl[0] * 10 ** 9, 3)) + ' nm')
+            # weights
+            plt.sca(axs_target[1])
+            plt.plot(self.weights.squeeze())
+            plt.xticks(xaxis, xtickslabels)
+            plt.xlabel('Angle [deg, °]')
+            plt.ylabel('Weight [1]')
+            plt.ylim([0, 1.05 * np.max(self.weights)])
+            plt.title('Weights at wavelength ' + str(np.round(self.wl[0] * 10 ** 9, 3)) + ' nm')
+        else:
+            yticks = np.linspace(0, self.target.shape[0], 10, dtype=int)
+            ytickslabels = np.linspace(np.min(self.angle), np.max(self.angle), 10, dtype=int)
+            xticks = np.linspace(0, self.target.shape[1], 10, dtype=int)
+            xtickslabels = np.linspace(np.min(self.wl * 10 ** 9), np.max(self.wl * 10 ** 9), 10, dtype=int)
+            colormap = None  # 'twilight'
+            # target:
+            g = sns.heatmap(self.target, vmin=0, vmax=1, ax=axs_target[0], xticklabels=xtickslabels, yticklabels=ytickslabels, cmap=colormap)
+            g.set_xticks(xticks)
+            g.set_yticks(yticks)
+            g.set_ylabel('Angle [deg, °]')
+            g.set_xlabel('Wavelength [nm]')
+            g.set_xticklabels(g.get_xticklabels(), rotation=45)
+            g.set_yticklabels(g.get_yticklabels(), rotation=0)
+            g.set_title('Target over angle and spectrum')
+            # weights:
+            g = sns.heatmap(self.weights, vmin=0, ax=axs_target[1], xticklabels=xtickslabels, yticklabels=ytickslabels, cmap=colormap)
+            g.set_xticks(xticks)
+            g.set_yticks(yticks)
+            g.set_ylabel('Angle [deg, °]')
+            g.set_xlabel('Wavelength [nm]')
+            g.set_xticklabels(g.get_xticklabels(), rotation=45)
+            g.set_yticklabels(g.get_yticklabels(), rotation=0)
+            g.set_title('Weights over angle and spectrum')
+            plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(0.1)
+        return [f_target, axs_target]
 
     def simulate(self, n, d):
         """
@@ -311,20 +439,76 @@ class MultiLayerThinFilm(gym.Env):
             """
         result_dicts = tmm.coh_tmm_fast_disp('s', n, d, (np.pi/180)*self.angle, self.wl)
         result_dictp = tmm.coh_tmm_fast_disp('p', n, d, (np.pi/180)*self.angle, self.wl)
-        rs = result_dicts['R']
-        rp = result_dictp['R']
-        r = (rs + rp) / 2
-        return r
+        if self.mode == 'reflectivity':
+            rs = result_dicts['R']
+            rp = result_dictp['R']
+            r = (rs + rp) / 2
+            return r
+        else:
+            ts = result_dicts['T']
+            tp = result_dictp['T']
+            t = (ts + tp) / 2
+            return t
 
-    def stack_layers(self):
+    def optimize(self, lb, ub, f_constraint=None):
+        from pyswarm import pso
+        if f_constraint is None:
+            xopt, fopt = pso(self.objective, lb, ub)
+        else:
+            xopt, fopt = pso(self.objective, lb, ub, f_ieqcons=f_constraint)
+        return xopt, fopt
+
+    def rcerror(self, d_array, n_array=None, set_environment=True, return_std=False):
+        if set_environment:
+            self.d = list(d_array)
+            if n_array is not None:
+                self.n = list(n_array)
+        assert len(self.d) == len(self.n), 'Length of d must coincide with length of n!'
+        cladded_n, cladded_d = self.stack_layers(d_array)
+        self.simulation = self.simulate(cladded_n, cladded_d)
+        temp = np.abs(self.simulation - self.target) * self.weights
+        temp[self.weights == 0] = np.nan
+        rcerror = np.nanmean(temp)
+        if return_std:
+            fom_std = np.nanstd(temp)
+            return rcerror, fom_std
+        return rcerror
+
+    def create_action(self, mat_number, thickness):
+        normalized_thickness = (thickness - self.min_thickness) / (self.max_thickness - self.min_thickness)
+        action = tuple((mat_number, np.array([normalized_thickness])))
+        return action
+
+    def create_stack(self, material_list, thickness_list=None):
+        if thickness_list is not None:
+            t = np.stack((thickness_list))
+        else:
+            t = np.empty()
+        n = []
+        for material in material_list:
+            n.append(self.N[material-1, :].reshape(1, -1))
+        n = np.vstack((n))
+        dictionary = {'n': n, 'd': t}
+        return n, t, dictionary
+
+    def stack_layers(self, d_array=None, n_array=None):
         """
         This method clads the stack suggested by the agent with the pre-defined cladding.
         The returned arrays n, d describe a particular stack, it includes the cladding.
             """
 
-        if len(self.n) != 0:
-            cladded_n = np.vstack((self.n))
-            cladded_d = np.vstack((self.d))
+        if n_array is not None:
+            n_list = list(n_array)
+        else:
+            n_list = self.n
+        if d_array is not None:
+            d_list = list(d_array)
+        else:
+            d_list = self.d
+
+        if len(n_list) != 0:
+            cladded_n = np.vstack((n_list))
+            cladded_d = np.vstack((d_list)).reshape(-1, 1)
             cladded_n = np.vstack((self.n_substrate, cladded_n))
             cladded_d = np.vstack((self.d_substrate, cladded_d))
             cladded_n = np.vstack((cladded_n, self.n_ambient))

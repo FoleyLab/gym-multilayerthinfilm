@@ -26,6 +26,5 @@ setup(
         "Intended Audience :: Science/Research/Industry",
         "Topic :: Scientific/Engineering/Optics",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3"],
-    install_requires=['env_mltf.yml']
+        "Programming Language :: Python :: 3"]
 )
